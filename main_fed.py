@@ -126,7 +126,7 @@ if __name__ == '__main__':
         p_gm, eta = get_args(var_receive, num_dataset, P_g, F, H)
 
         # transmit gradients with AirComp
-        # signal_grad: dimension: m x D 
+        # signal_grad: list [dict1, dict2, ..., dictm]
         signal_grad = transmit_grad(grad_locals, mean_locals, var_locals, p_gm)
 
         # apply matched filtering to get distance

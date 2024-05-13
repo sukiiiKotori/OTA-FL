@@ -64,12 +64,19 @@ class LocalUpdate(object):
             grad_dict[k] = (initial_weight[k] - new_weight[k]).cpu() / self.args.lr
         #print(grad_dict)
         flat_tensor = []
-        for k, v in grad_dict.items():
+        flat_tensor_2 = np.array([[]])
+        for _, v in grad_dict.items():
             for tensor in v:
                 flat_tensor.append(tensor.flatten())
+
+        for _, v in grad_dict.items():
+            flat_tensor_2 = np.hstack((flat_tensor_2, np.reshape(v.numpy(),[1,-1])))
+
         #print(flat_tensor)
         final_vector = torch.cat(flat_tensor)
-        print(final_vector)
+        np.set_printoptions(edgeitems=100, threshold=1000)
+        print(final_vector.numpy().shape)
+        print(flat_tensor_2.shape)
         grad_mean = final_vector.mean()
         grad_var = final_vector.std(correction=0) #don't use unbiased estimation
         print(grad_mean)

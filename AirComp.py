@@ -1,4 +1,5 @@
 import numpy as np
+from collections import OrderedDict
 
 def transmission_var(var_locals, mean_locals, P_v, F, H, v_max, noise_v):
     noise_factor = np.array(F).conj() @ noise_v #(1xN @ NxM = 1xM)
@@ -17,8 +18,22 @@ def transmission_mean(mean_locals, dist_locals, P_u, F, H, u_max, dist_max, nois
     receive_signals = np.abs(np.array(mean_locals)) * np.exp(1j*theta) + (u_max * noise_factor) / (p_u * inner)
     return np.abs(receive_signals), np.angle(receive_signals) / 2*np.pi * dist_max
 
-def transmit_grad(grads, args):
-    pass
+def transmit_grad(grad_locals, mean_locals, var_locals, p_gm):
+    signal_grad = []
+    for m in range(len(grad_locals)):
+        dict = OrderedDict()
+        for k, v in grad_locals[m].items():
+            # formula (9)
+            dict[k] = p_gm[m] * (v - mean_locals[m]) / var_locals[m]
+        signal_grad.append(dict)
+    return signal_grad
 
-def receive_grad():
-    pass
+def receive_grad(F, H, signal_grad, eta, noise_g):
+    N, M = H.shape
+    signal_receive = []
+    for n in range(N):
+        new_dict = OrderedDict()
+
+        signal_receive.append(new_dict)
+    #for m in range(len(signal_grad)):
+        

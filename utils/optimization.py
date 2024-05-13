@@ -4,7 +4,7 @@ def optimal_power():
     p_u:float
     p_v:float
     p_g:float
-    return p_u, p_v, p_g
+    return 1, 1, 1
 
 def optimal_power_selection():
     p_u:float
