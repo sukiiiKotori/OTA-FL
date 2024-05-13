@@ -1,0 +1,78 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# Python version: 3.6
+
+import torch
+import copy
+from collections import OrderedDict
+from torch import nn, autograd
+from torch.utils.data import DataLoader, Dataset
+import numpy as np
+import random
+from sklearn import metrics
+
+
+class DatasetSplit(Dataset):
+    def __init__(self, dataset, idxs):
+        self.dataset = dataset
+        self.idxs = list(idxs)
+
+    def __len__(self):
+        return len(self.idxs)
+
+    def __getitem__(self, item):
+        image, label = self.dataset[self.idxs[item]]
+        return image, label
+
+
+class LocalUpdate(object):
+    def __init__(self, args, dataset=None, idxs=None):
+        self.args = args
+        self.loss_func = nn.CrossEntropyLoss()
+        self.selected_clients = []
+        self.ldr_train = DataLoader(DatasetSplit(dataset, idxs), batch_size=self.args.local_bs, shuffle=True)
+
+    def train(self, net: nn.Module) -> tuple[OrderedDict, float, float, float]:
+        net.train()
+        # train and update
+        optimizer = torch.optim.SGD(net.parameters(), lr=self.args.lr, momentum=self.args.momentum)
+
+        #save weights before training
+        initial_weight = copy.deepcopy(net.state_dict())
+
+        epoch_loss = []
+        for iter in range(self.args.local_ep):
+            batch_loss = []
+            for batch_idx, (images, labels) in enumerate(self.ldr_train):
+                images, labels = images.to(self.args.device), labels.to(self.args.device)
+                net.zero_grad()
+                log_probs = net(images)
+                loss = self.loss_func(log_probs, labels)
+                loss.backward()
+                optimizer.step()
+                if self.args.verbose and batch_idx % 10 == 0:
+                    print('Update Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
+                        iter, batch_idx * len(images), len(self.ldr_train.dataset),
+                               100. * batch_idx / len(self.ldr_train), loss.item()))
+                batch_loss.append(loss.item())
+            epoch_loss.append(sum(batch_loss)/len(batch_loss))
+
+        #get accumulated gradients
+        grad_dict = OrderedDict()
+        new_weight = net.state_dict()
+        for k in initial_weight.keys():
+            grad_dict[k] = (initial_weight[k] - new_weight[k]).cpu() / self.args.lr
+        #print(grad_dict)
+        flat_tensor = []
+        for k, v in grad_dict.items():
+            for tensor in v:
+                flat_tensor.append(tensor.flatten())
+        #print(flat_tensor)
+        final_vector = torch.cat(flat_tensor)
+        print(final_vector)
+        grad_mean = final_vector.mean()
+        grad_var = final_vector.std(correction=0) #don't use unbiased estimation
+        print(grad_mean)
+        print(grad_var)
+        return grad_dict, grad_mean, grad_var, sum(epoch_loss) / len(epoch_loss)
+
