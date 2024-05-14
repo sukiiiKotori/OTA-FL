@@ -4,9 +4,10 @@
 
 
 import numpy as np
+import random
 from torchvision import datasets, transforms
 
-def mnist_iid(dataset, num_users):
+def iid(dataset, num_users):
     """
     Sample I.I.D. client data from MNIST dataset
     :param dataset:
@@ -21,13 +22,13 @@ def mnist_iid(dataset, num_users):
     return dict_users
 
 
-def mnist_noniid(dataset, num_users):
-    """
+""" def mnist_noniid(dataset, num_users):
+    
     Sample non-I.I.D client data from MNIST dataset
     :param dataset:
     :param num_users:
     :return:
-    """
+    
     num_shards, num_imgs = 200, 300
     idx_shard = [i for i in range(num_shards)]
     dict_users = {i: np.array([], dtype='int64') for i in range(num_users)}
@@ -45,20 +46,25 @@ def mnist_noniid(dataset, num_users):
         idx_shard = list(set(idx_shard) - rand_set)
         for rand in rand_set:
             dict_users[i] = np.concatenate((dict_users[i], idxs[rand*num_imgs:(rand+1)*num_imgs]), axis=0)
-    return dict_users
+    return dict_users """
 
-
-def cifar_iid(dataset, num_users):
+def noniid(dataset, num_users):
     """
-    Sample I.I.D. client data from CIFAR10 dataset
+    Sample non-I.I.D. client data from MNIST dataset
     :param dataset:
     :param num_users:
-    :return: dict of image index
+    :return: dict of image indexes
     """
-    num_items = int(len(dataset)/num_users)
+    total_size = len(dataset)
+    points = random.sample(range(1, total_size), num_users-1)
+    points.sort()
+
+    sizes = [points[0]] + [points[i+1] - points[i] for i in range(num_users-2)]
+    sizes.append(total_size - points[-1])
+    
     dict_users, all_idxs = {}, [i for i in range(len(dataset))]
     for i in range(num_users):
-        dict_users[i] = set(np.random.choice(all_idxs, num_items, replace=False))
+        dict_users[i] = set(np.random.choice(all_idxs, sizes[i], replace=False))
         all_idxs = list(set(all_idxs) - dict_users[i])
     return dict_users
 
@@ -70,4 +76,4 @@ if __name__ == '__main__':
                                        transforms.Normalize((0.1307,), (0.3081,))
                                    ]))
     num = 100
-    d = mnist_noniid(dataset_train, num)
+    d = noniid(dataset_train, num)

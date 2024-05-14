@@ -10,7 +10,7 @@ import numpy as np
 from torchvision import datasets, transforms
 import torch
 
-from utils.sampling import mnist_iid, mnist_noniid, cifar_iid
+from utils.sampling import *
 from utils.options import args_parser
 from utils.optimization import *
 from models.Update import LocalUpdate
@@ -31,21 +31,24 @@ if __name__ == '__main__':
         trans_mnist = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))])
         dataset_train = datasets.MNIST('../data/mnist/', train=True, download=True, transform=trans_mnist)
         dataset_test = datasets.MNIST('../data/mnist/', train=False, download=True, transform=trans_mnist)
-        # sample users
-        if args.iid:
-            dict_users = mnist_iid(dataset_train, args.num_users)
-        else:
-            dict_users = mnist_noniid(dataset_train, args.num_users)
     elif args.dataset == 'cifar':
         trans_cifar = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
         dataset_train = datasets.CIFAR10('../data/cifar', train=True, download=True, transform=trans_cifar)
         dataset_test = datasets.CIFAR10('../data/cifar', train=False, download=True, transform=trans_cifar)
-        if args.iid:
-            dict_users = cifar_iid(dataset_train, args.num_users)
-        else:
-            exit('Error: only consider IID setting in CIFAR10')
     else:
         exit('Error: unrecognized dataset')
+
+    if args.iid:
+        dict_users = iid(dataset_train, args.num_users)
+    else:
+        dict_users = noniid(dataset_train, args.num_users)
+    
+    # get the number of dataset per user have
+    data_per_user = []
+    for _,v in dict_users.items():
+        data_per_user.append(len(v))
+    print(data_per_user)
+    
     img_size = dataset_train[0][0].shape
 
     # build model
@@ -79,11 +82,8 @@ if __name__ == '__main__':
     v_max = 3.0
     u_max = 0.1
     dist_max = 1000.0
-    noise_g = (np.random.randn(args.N,D)+1j*np.random.randn(args.N,D)) / 2**0.5
-    noise_u = (np.random.randn(args.N, args.num_users)+1j*np.random.randn(args.N, args.num_users)) / 2**0.5
-    noise_v = (np.random.randn(args.N, args.num_users)+1j*np.random.randn(args.N, args.num_users)) / 2**0.5
-    num_dataset = []
-    if args.fading:#consider channel fading
+
+    if args.fading: # consider channel fading
         # module (0,1)
         H_mod = np.random.uniform(low=0.0, high=1.0, size=(args.N, args.num_users))
         # phase (0,2π)
@@ -95,21 +95,25 @@ if __name__ == '__main__':
         # not consider channel fading, so every term in f is equal to 1/sqrt(N)
         H = np.ones((args.N, args.num_users), dtype = complex)
         F = [1.0 / np.sqrt(args.N)] * args.N
+
     # derive optimal transmit power
     # not consider user selection M and beamforming vector f
-
     if args.all_clients:
-        M = [i for i in range(args.num_users)]
+        # all users are selected 
+        user_list = [i for i in range(args.num_users)]
         P_u, P_v, P_G = optimal_power()
     else:
-        P_u, P_v, P_G, M = optimal_power_selection()
+        P_u, P_v, P_G, user_list = optimal_power_selection()
+
+    total_size = sum(data_per_user[idx] for idx in user_list)
+    print(total_size)
     
     for iter in range(args.epochs):
         loss_locals = []
         grad_locals = []
         mean_locals = []
         var_locals = []
-        for idx in M:
+        for idx in user_list:
             local = LocalUpdate(args=args, dataset=dataset_train, idxs=dict_users[idx])
             grad, grad_mean, grad_var, loss = local.train(net=copy.deepcopy(net_glob).to(args.device))
             #train and collect results
@@ -131,7 +135,9 @@ if __name__ == '__main__':
 
         # get transmit power of gradients and eta for AirComp
         P_g = P_G / D
-        p_gm, eta = get_args(var_receive, num_dataset, P_g, F, H)
+        # formula (26),(27)
+        # p_gm: np.array [p_g1, p_g2, ..., p_gm], eta: real factor
+        p_gm, eta = get_args(var_receive, data_per_user, P_g, F, H)
 
         # transmit gradients with AirComp
         # signal_grad: matrix [m x D]; grad_locals: matrix [m x D]
@@ -149,16 +155,16 @@ if __name__ == '__main__':
         # transmit and receive means / quantilized angle to transfer distances
         # mean_abs_receive: list [mean_abs1, mean_abs2, ..., mean_absm]; angle dist: list [angle1, angle2, ..., anglem]
         # dist_max: to quantilize angle
-        mean_abs_receive, dist_receive = transmission_mean(mean_locals, dist_locals, P_u, F, H, u_max, dist_max, noise_u)
+        mean_abs_receive, dist_receive = transmission_mean(mean_locals, dist_locals, P_u, F, H, u_max, dist_max)
 
         # formula (18): u = \sigma(Km * um)
-        bias = np.array(num_dataset) @ (np.array(mean_abs_receive) * np.array(sign_mean))
+        bias = np.array(data_per_user) @ (np.array(mean_abs_receive) * np.array(sign_mean))
 
         # add received means
         grad_receive += bias
 
         #update global weights
-        FedAvg_Air(w_glob, grad_receive, args)
+        FedAvg_Air(w_glob, grad_receive, total_size, args)
 
         # copy weight to net_glob
         net_glob.load_state_dict(w_glob)

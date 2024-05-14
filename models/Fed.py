@@ -16,14 +16,13 @@ def FedAvg(w):
         w_avg[k] = torch.div(w_avg[k], len(w))
     return w_avg
 
-#parameter 1 is a reference, so we modify it directly.
-def FedAvg_Air(weight_global, grad, args):
+#parameter weight_global is a reference, so we modify it directly.
+def FedAvg_Air(weight_global, grad, total_size, args):
     lr = args.lr
-    data_sum = args.num_dataset
     idx = 0
     for k in weight_global.keys():
         shape = np.array(weight_global[k].size())
         if len(shape):
             lenth = np.prod(shape)
-            weight_global[k] -= torch.from_numpy(np.reshape(grad[idx:idx+lenth],shape)).float().to(args.device) * lr / data_sum
+            weight_global[k] -= torch.from_numpy(np.reshape(grad[idx:idx+lenth],shape)).float().to(args.device) * lr / total_size
             idx += lenth
