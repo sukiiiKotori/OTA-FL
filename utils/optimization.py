@@ -1,10 +1,7 @@
 import numpy as np
 
 def optimal_power():
-    p_u:float
-    p_v:float
-    p_g:float
-    return 1, 1, 1
+    return 0.2, 0.4, 0.4
 
 def optimal_power_selection():
     p_u:float

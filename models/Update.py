@@ -69,8 +69,8 @@ class LocalUpdate(object):
 
         grad_mean = flat_grad.mean()
         grad_var = flat_grad.std() #don't use unbiased estimation
-        #print(grad_mean)
-        #print(grad_var)
+        print(grad_mean)
+        print(grad_var)
         #print(type(flat_grad))
         #print(flat_grad.shape)
         #temp = np.reshape(flat_grad,(5,-1))

@@ -79,22 +79,9 @@ if __name__ == '__main__':
 
     #initialize simulation settings
     D = sum(p.numel() for p in net_glob.parameters()) #number of model weights
-    v_max = 3.0
-    u_max = 0.1
-    dist_max = 1000.0
-
-    if args.fading: # consider channel fading
-        # module (0,1)
-        H_mod = np.random.uniform(low=0.0, high=1.0, size=(args.N, args.num_users))
-        # phase (0,2π)
-        H_phase = np.random.uniform(low=0.0, high=2*np.pi, size=(args.N, args.num_users))
-        # H = (0,1)e^(j(0,2π))
-        H = H_mod * np.exp(1j * H_phase)
-        F = optimal_beamforming() #to be continue
-    else:
-        # not consider channel fading, so every term in f is equal to 1/sqrt(N)
-        H = np.ones((args.N, args.num_users), dtype = complex)
-        F = [1.0 / np.sqrt(args.N)] * args.N
+    v_max = 5
+    u_max = 0.5
+    dist_max = 1000.0 # to quantify distance
 
     # derive optimal transmit power
     # not consider user selection M and beamforming vector f
@@ -104,6 +91,22 @@ if __name__ == '__main__':
         P_u, P_v, P_G = optimal_power()
     else:
         P_u, P_v, P_G, user_list = optimal_power_selection()
+
+    num_users = len(user_list)
+
+    if args.fading: # consider channel fading
+        # module (0,1)
+        H_mod = np.random.uniform(low=0.0, high=1.0, size=(args.N, num_users))
+        # phase (0,2π)
+        H_phase = np.random.uniform(low=0.0, high=2*np.pi, size=(args.N, num_users))
+        # H = (0,1)e^(j(0,2π))
+        H = H_mod * np.exp(1j * H_phase)
+        F = optimal_beamforming() #to be continue
+    else:
+        # not consider channel fading, so every term in f is equal to 1/sqrt(N)
+        H = np.ones((args.N, num_users), dtype = complex)
+        F = [1.0 / np.sqrt(args.N)] * args.N
+
 
     total_size = sum(data_per_user[idx] for idx in user_list)
     print(total_size)
@@ -161,10 +164,16 @@ if __name__ == '__main__':
         bias = np.array(data_per_user) @ (np.array(mean_abs_receive) * np.array(sign_mean))
 
         # add received means
-        grad_receive += bias
+        grad_receive = (grad_receive + bias) / total_size
+
+        grad_groudtruth = np.average(grad_locals, axis=0, weights= np.array(data_per_user))
+
+        error = grad_receive - grad_groudtruth
+
+        print(error)
 
         #update global weights
-        FedAvg_Air(w_glob, grad_receive, total_size, args)
+        FedAvg_Air(w_glob, grad_receive, args)
 
         # copy weight to net_glob
         net_glob.load_state_dict(w_glob)

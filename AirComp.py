@@ -3,7 +3,7 @@ from collections import OrderedDict
 
 def transmission_var(var_locals, mean_locals, P_v, F, H, v_max):
     N, M = H.shape
-    noise = (np.random.randn(N, M)+1j*np.random.randn(N, M)) / 2**0.5
+    noise = (np.random.randn(N, M)+1j*np.random.randn(N, M)) / 2**0.5 * 1e-10
     noise_factor = np.array(F).conj() @ noise #(1xN @ NxM = 1xM)
     inner = np.array(F).conj() @ H #(1xN @ NxM = 1xM)
     p_v = np.sqrt(P_v)
@@ -13,7 +13,7 @@ def transmission_var(var_locals, mean_locals, P_v, F, H, v_max):
 
 def transmission_mean(mean_locals, dist_locals, P_u, F, H, u_max, dist_max):
     N, M = H.shape
-    noise = (np.random.randn(N, M)+1j*np.random.randn(N, M)) / 2**0.5
+    noise = (np.random.randn(N, M)+1j*np.random.randn(N, M)) / 2**0.5 * 1e-10
     noise_factor = np.array(F).conj() @ noise #(1xN @ NxM = 1xM)
     inner = np.array(F).conj() @ H #(1xN @ NxM = 1xM)
     p_u = np.sqrt(P_u)
@@ -30,7 +30,7 @@ def transmit_grad(grad_locals, mean_locals, var_locals, p_gm):
 def receive_grad(F, H, signal_grad, eta):
     N, M = H.shape
     _, D = signal_grad.shape
-    noise = (np.random.randn(N,D)+1j*np.random.randn(N,D)) / 2**0.5
+    noise = (np.random.randn(N,D)+1j*np.random.randn(N,D)) / 2**0.5 * 1e-10
     # formula (13)
     signals = H @ signal_grad + noise # nxD = nxm @ mxD
     receive_signals = np.array(F).conj() @ signals # 1xD = 1xn @ nxD
