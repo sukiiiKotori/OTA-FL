@@ -4,6 +4,7 @@
 
 import copy
 import torch
+import numpy as np
 from torch import nn
 
 
@@ -19,5 +20,10 @@ def FedAvg(w):
 def FedAvg_Air(weight_global, grad, args):
     lr = args.lr
     data_sum = args.num_dataset
+    idx = 0
     for k in weight_global.keys():
-        weight_global[k] -= lr * grad[k] / data_sum
+        shape = np.array(weight_global[k].size())
+        if len(shape):
+            lenth = np.prod(shape)
+            weight_global[k] -= torch.from_numpy(np.reshape(grad[idx:idx+lenth],shape)).float().to(args.device) * lr / data_sum
+            idx += lenth

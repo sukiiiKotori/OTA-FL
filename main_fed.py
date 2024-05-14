@@ -75,7 +75,7 @@ if __name__ == '__main__':
     val_acc_list, net_list = [], []
 
     #initialize simulation settings
-    D = 30000 #number of model weights
+    D = sum(p.numel() for p in net_glob.parameters()) #number of model weights
     v_max = 3.0
     u_max = 0.1
     dist_max = 1000.0
@@ -100,9 +100,9 @@ if __name__ == '__main__':
 
     if args.all_clients:
         M = [i for i in range(args.num_users)]
-        P_u, P_v, P_g = optimal_power()
+        P_u, P_v, P_G = optimal_power()
     else:
-        P_u, P_v, P_g, M = optimal_power_selection()
+        P_u, P_v, P_G, M = optimal_power_selection()
     
     for iter in range(args.epochs):
         loss_locals = []
@@ -116,17 +116,25 @@ if __name__ == '__main__':
             grad_locals.append(copy.deepcopy(grad))
             loss_locals.append(copy.deepcopy(loss))
             mean_locals.append(grad_mean)
-            var_locals.append(grad_var)                                                                
+            var_locals.append(grad_var)   
+
+        # transfer list[grad1, grad2, ...,gradm] to matrix [m x D]
+        grad_locals = np.array(grad_locals)
+        mean_locals = np.array(mean_locals)
+        var_locals = np.array(var_locals)
+        print(grad_locals.shape)
+        print(grad_locals)                                                             
         
         # transmit and receive variances/ sign of means
         # var_receive: list [var1, var2, ..., varm]; sign_mean: list [+1, -1, -1, +1]
-        var_receive, sign_mean = transmission_var(var_locals, mean_locals, P_v, F, H, v_max, noise_v)
+        var_receive, sign_mean = transmission_var(var_locals, mean_locals, P_v, F, H, v_max)
 
         # get transmit power of gradients and eta for AirComp
+        P_g = P_G / D
         p_gm, eta = get_args(var_receive, num_dataset, P_g, F, H)
 
         # transmit gradients with AirComp
-        # signal_grad: list [dict1, dict2, ..., dictm]
+        # signal_grad: matrix [m x D]; grad_locals: matrix [m x D]
         signal_grad = transmit_grad(grad_locals, mean_locals, var_locals, p_gm)
 
         # apply matched filtering to get distance
@@ -135,7 +143,8 @@ if __name__ == '__main__':
         
         # recieve gradients with AirComp
         # at this time, means have not been add to the grads
-        grad_receive = receive_grad(F, H, signal_grad, eta, noise_g)
+        # grad_receive: vector [1 x D]
+        grad_receive = receive_grad(F, H, signal_grad, eta)
 
         # transmit and receive means / quantilized angle to transfer distances
         # mean_abs_receive: list [mean_abs1, mean_abs2, ..., mean_absm]; angle dist: list [angle1, angle2, ..., anglem]
@@ -146,8 +155,7 @@ if __name__ == '__main__':
         bias = np.array(num_dataset) @ (np.array(mean_abs_receive) * np.array(sign_mean))
 
         # add received means
-        for k in grad_receive.keys():
-            grad_receive[k] += bias
+        grad_receive += bias
 
         #update global weights
         FedAvg_Air(w_glob, grad_receive, args)

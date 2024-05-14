@@ -17,11 +17,11 @@ def optimal_beamforming():
     #to be continue
     return []
 
-def get_args(var_receive, num_dataset, p_g, F, H):  
+def get_args(var_receive, num_dataset, P_g, F, H):  
     inner = np.array(F).conj() @ H #(1xN @ NxM = 1xM)
-    eta_arr = (np.abs(inner) / (np.array(num_dataset) * np.array(var_receive)))**2
+    eta_arr = (np.abs(inner) / (np.array(num_dataset) * var_receive))**2
     #get eta
-    eta = p_g * np.min(eta_arr)
+    eta = P_g * np.min(eta_arr)
     #get p_gm
-    p_gm = np.array(num_dataset) * np.sqrt(eta) * np.array(var_receive) / inner
+    p_gm = np.array(num_dataset) * np.sqrt(eta) * var_receive / inner
     return p_gm, eta

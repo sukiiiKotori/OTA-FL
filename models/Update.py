@@ -32,7 +32,7 @@ class LocalUpdate(object):
         self.selected_clients = []
         self.ldr_train = DataLoader(DatasetSplit(dataset, idxs), batch_size=self.args.local_bs, shuffle=True)
 
-    def train(self, net: nn.Module) -> tuple[OrderedDict, float, float, float]:
+    def train(self, net: nn.Module):
         net.train()
         # train and update
         optimizer = torch.optim.SGD(net.parameters(), lr=self.args.lr, momentum=self.args.momentum)
@@ -63,23 +63,18 @@ class LocalUpdate(object):
         for k in initial_weight.keys():
             grad_dict[k] = (initial_weight[k] - new_weight[k]).cpu() / self.args.lr
         #print(grad_dict)
-        flat_tensor = []
-        flat_tensor_2 = np.array([[]])
+        flat_grad = np.array([])
         for _, v in grad_dict.items():
-            for tensor in v:
-                flat_tensor.append(tensor.flatten())
+            flat_grad = np.hstack((flat_grad, v.numpy().ravel()))
 
-        for _, v in grad_dict.items():
-            flat_tensor_2 = np.hstack((flat_tensor_2, np.reshape(v.numpy(),[1,-1])))
-
-        #print(flat_tensor)
-        final_vector = torch.cat(flat_tensor)
-        np.set_printoptions(edgeitems=100, threshold=1000)
-        print(final_vector.numpy().shape)
-        print(flat_tensor_2.shape)
-        grad_mean = final_vector.mean()
-        grad_var = final_vector.std(correction=0) #don't use unbiased estimation
-        print(grad_mean)
-        print(grad_var)
-        return grad_dict, grad_mean, grad_var, sum(epoch_loss) / len(epoch_loss)
+        grad_mean = flat_grad.mean()
+        grad_var = flat_grad.std() #don't use unbiased estimation
+        #print(grad_mean)
+        #print(grad_var)
+        #print(type(flat_grad))
+        #print(flat_grad.shape)
+        #temp = np.reshape(flat_grad,(5,-1))
+        #print(temp.shape)
+        #print(temp)
+        return flat_grad, grad_mean, grad_var, sum(epoch_loss) / len(epoch_loss)
 
