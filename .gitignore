@@ -51,3 +51,8 @@ ENV/
 
 # test file
 test*.py
+
+# log file
+/log
+/save
+result*

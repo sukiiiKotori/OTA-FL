@@ -10,6 +10,7 @@ from torch.utils.data import DataLoader, Dataset
 import numpy as np
 import random
 from sklearn import metrics
+import time
 
 
 class DatasetSplit(Dataset):
@@ -33,6 +34,7 @@ class LocalUpdate(object):
         self.ldr_train = DataLoader(DatasetSplit(dataset, idxs), batch_size=self.args.local_bs, shuffle=True)
 
     def train(self, net: nn.Module):
+        start_time = time.time()
         net.train()
         # train and update
         optimizer = torch.optim.SGD(net.parameters(), lr=self.args.lr, momentum=self.args.momentum)
@@ -56,6 +58,9 @@ class LocalUpdate(object):
                                100. * batch_idx / len(self.ldr_train), loss.item()))
                 batch_loss.append(loss.item())
             epoch_loss.append(sum(batch_loss)/len(batch_loss))
+        
+        end_time = time.time()
+        print("time consume: ", end_time - start_time)
 
         #get accumulated gradients
         grad_dict = OrderedDict()
@@ -69,8 +74,9 @@ class LocalUpdate(object):
 
         grad_mean = flat_grad.mean()
         grad_var = flat_grad.std() #don't use unbiased estimation
-        print(grad_mean)
-        print(grad_var)
+        #print("local gradients mean:     ", grad_mean)
+        #print("local gradients variance: ", grad_var)
+        #print(flat_grad)
         #print(type(flat_grad))
         #print(flat_grad.shape)
         #temp = np.reshape(flat_grad,(5,-1))

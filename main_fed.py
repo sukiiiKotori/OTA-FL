@@ -9,6 +9,7 @@ import copy
 import numpy as np
 from torchvision import datasets, transforms
 import torch
+from datetime import datetime
 
 from utils.sampling import *
 from utils.options import args_parser
@@ -22,9 +23,20 @@ from sensing import *
 
 
 if __name__ == '__main__':
+    # set print args of numpy
+    np.set_printoptions(edgeitems=6,threshold=1000,linewidth=200)
+
     # parse args
     args = args_parser()
-    args.device = torch.device('cuda:{}'.format(args.gpu) if torch.cuda.is_available() and args.gpu != -1 else 'cpu')
+    if torch.cuda.is_available():
+        args.device = torch.device('cuda:0')
+    elif torch.backends.mps.is_available():
+        args.device = torch.device('mps')
+    else:
+        args.device = torch.device('cpu')
+
+    args.device = torch.device('cpu')
+    print('device: ', args.device)
 
     # load dataset and split users
     if args.dataset == 'mnist':
@@ -81,35 +93,36 @@ if __name__ == '__main__':
     D = sum(p.numel() for p in net_glob.parameters()) #number of model weights
     v_max = 5
     u_max = 0.5
+    sigma_n = 1e-3
     dist_max = 1000.0 # to quantify distance
-
-    # derive optimal transmit power
-    # not consider user selection M and beamforming vector f
-    if args.all_clients:
-        # all users are selected 
-        user_list = [i for i in range(args.num_users)]
-        P_u, P_v, P_G = optimal_power()
-    else:
-        P_u, P_v, P_G, user_list = optimal_power_selection()
-
-    num_users = len(user_list)
 
     if args.fading: # consider channel fading
         # module (0,1)
-        H_mod = np.random.uniform(low=0.0, high=1.0, size=(args.N, num_users))
+        H_mod = np.random.uniform(low=0.0, high=1.0, size=(args.N, args.num_users))
         # phase (0,2π)
-        H_phase = np.random.uniform(low=0.0, high=2*np.pi, size=(args.N, num_users))
+        H_phase = np.random.uniform(low=0.0, high=2*np.pi, size=(args.N, args.num_users))
         # H = (0,1)e^(j(0,2π))
         H = H_mod * np.exp(1j * H_phase)
         F = optimal_beamforming() #to be continue
     else:
         # not consider channel fading, so every term in f is equal to 1/sqrt(N)
-        H = np.ones((args.N, num_users), dtype = complex)
+        H = np.ones((args.N, args.num_users), dtype = complex)
         F = [1.0 / np.sqrt(args.N)] * args.N
 
+    # derive optimal transmit power
+    # not consider user selection M and beamforming vector f
+    if args.all_clients:
+        # all users are selected 
+        P_u, P_v, P_G, user_list = optimal_power()
+    else:
+        P_u, P_v, P_G, user_list = optimal_power_selection()
 
+    num_users = len(user_list)
+    if num_users < args.num_users:
+        pass
     total_size = sum(data_per_user[idx] for idx in user_list)
-    print(total_size)
+    
+    #print(total_size)
     
     for iter in range(args.epochs):
         loss_locals = []
@@ -130,11 +143,13 @@ if __name__ == '__main__':
         mean_locals = np.array(mean_locals)
         var_locals = np.array(var_locals)
         print(grad_locals.shape)
-        print(grad_locals)                                                             
+        #print(grad_locals)          
+        print("local gradients mean:   ", mean_locals) 
+        print("local gradients variance", var_locals)                                                  
         
         # transmit and receive variances/ sign of means
         # var_receive: list [var1, var2, ..., varm]; sign_mean: list [+1, -1, -1, +1]
-        var_receive, sign_mean = transmission_var(var_locals, mean_locals, P_v, F, H, v_max)
+        var_receive, sign_mean = transmission_var(var_locals, mean_locals, P_v, F, H, v_max, sigma_n)
 
         # get transmit power of gradients and eta for AirComp
         P_g = P_G / D
@@ -153,12 +168,12 @@ if __name__ == '__main__':
         # recieve gradients with AirComp
         # at this time, means have not been add to the grads
         # grad_receive: vector [1 x D]
-        grad_receive = receive_grad(F, H, signal_grad, eta)
+        grad_receive = receive_grad(F, H, signal_grad, eta, sigma_n)
 
         # transmit and receive means / quantilized angle to transfer distances
         # mean_abs_receive: list [mean_abs1, mean_abs2, ..., mean_absm]; angle dist: list [angle1, angle2, ..., anglem]
         # dist_max: to quantilize angle
-        mean_abs_receive, dist_receive = transmission_mean(mean_locals, dist_locals, P_u, F, H, u_max, dist_max)
+        mean_abs_receive, dist_receive = transmission_mean(mean_locals, dist_locals, P_u, F, H, u_max, dist_max, sigma_n)
 
         # formula (18): u = \sigma(Km * um)
         bias = np.array(data_per_user) @ (np.array(mean_abs_receive) * np.array(sign_mean))
@@ -170,7 +185,11 @@ if __name__ == '__main__':
 
         error = grad_receive - grad_groudtruth
 
+        print("Error of transmission:")
         print(error)
+        print("ground_truth")
+        print(grad_groudtruth)
+        print("L2 norm of error: ", np.linalg.norm(error))
 
         #update global weights
         FedAvg_Air(w_glob, grad_receive, args)
@@ -187,7 +206,7 @@ if __name__ == '__main__':
     plt.figure()
     plt.plot(range(len(loss_train)), loss_train)
     plt.ylabel('train_loss')
-    plt.savefig('./save/fed_{}_{}_{}_iid{}.png'.format(args.dataset, args.model, args.epochs, args.iid))
+    plt.savefig('./save/fed_{}_{}_{}_iid{}_{}.png'.format(args.dataset, args.model, args.epochs, args.iid, datetime.now().strftime('%Y-%m-%d-%H:%M')))
 
     # testing
     net_glob.eval()
@@ -196,3 +215,5 @@ if __name__ == '__main__':
     print("Training accuracy: {:.2f}".format(acc_train))
     print("Testing accuracy: {:.2f}".format(acc_test))
 
+    # save weight file
+    torch.save(net_glob.state_dict(), './save/fed_{}_{}_{}_iid{}_{}.pth'.format(args.dataset, args.model, args.epochs, args.iid, datetime.now().strftime('%Y-%m-%d-%H:%M')))
