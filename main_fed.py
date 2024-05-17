@@ -92,17 +92,17 @@ if __name__ == '__main__':
     D = sum(p.numel() for p in net_glob.parameters()) #number of model weights
     v_max = 5
     u_max = 0.5
-    P_max = 0.1 * D
+    P_max = 0.1 * D * 2
     beta_1 = 1.0
     beta_2 = 2.0
 
     # communication settings
-    sigma_n = 1e-3 # sqrt(noise power)
-    PL_exponent = 3.76 # User-BS Path loss exponent
+    sigma_n = 1e-4 # sqrt(noise power)
+    PL_exponent = 2.5 # User-BS Path loss exponent
     fc = 915 * 10**6 # carrier frequency 915MHz
     wave_lenth = 3.0 * 10**8 / fc # wave_lenth = c/f
-    BS_gain = 10**(5.0/10) # BS antenna gain 5dBi
-    User_gain = 10**(0.0/10) # user antenna gain 0dBi
+    BS_gain = 10**(20.0/10) # BS antenna gain 20dBi
+    User_gain = 10**(5.0/10) # user antenna gain 5dBi
     dist_max = 1000.0 # to quantify distance
     BS_hight = 10 # BS hight is 10m
 
@@ -118,15 +118,15 @@ if __name__ == '__main__':
     else:
         exit('Error: unrecognized radius')
 
-    # get distances from users to BS
+    # get distances from BS to Users
     BS_dist = np.sqrt(radius**2 + BS_hight**2)
 
     # get path loss
     Path_loss = BS_gain * User_gain * (wave_lenth / (4 * np.pi * BS_dist))**PL_exponent
 
     # get shadow loss
-    #shadow_loss = (np.random.randn(args.N, args.num_users) + 1j * np.random.randn(args.N, args.num_users)) / 2**0.5
-    shadow_loss = np.ones(args.N, args.num_users)
+    shadow_loss = (np.random.randn(args.N, args.num_users) + 1j * np.random.randn(args.N, args.num_users)) / 2**0.5
+    #shadow_loss = np.ones((args.N, args.num_users))
 
     print("PL", Path_loss)
 
@@ -138,10 +138,10 @@ if __name__ == '__main__':
     noise_factor = np.array(F).conj() @ noise #(1xN @ NxM = 1xM)
     inner = np.array(F).conj() @ H_origin #(1xN @ NxM = 1xM)
     p_v = np.sqrt(1)
-    print("receive SNR:", (p_v * inner) / (v_max * noise_factor))
+    print("receive error:",  (v_max * noise_factor)/(p_v * inner))
     # get the number of dataset per user have
 
-    exit('test')
+    #exit('test')
     data_per_user = []
     for _,v in dict_users.items():
         data_per_user.append(len(v))
@@ -155,6 +155,7 @@ if __name__ == '__main__':
     else:
         P_u, P_v, P_G, user_list = optimal_power_selection()
 
+    exit("test opt")
     H = H_origin[:, user_list]
 
     num_users = len(user_list)
@@ -221,15 +222,18 @@ if __name__ == '__main__':
         # add received means
         grad_receive = (grad_receive + bias) / total_size
 
+        #grad_receive_abs = (grad_receive_abs + bias) / total_size
+
         grad_groudtruth = np.average(grad_locals, axis=0, weights= np.array(data_per_user))
 
         error = grad_receive - grad_groudtruth
+        #error_2 = grad_receive_abs - grad_groudtruth
 
         print("Error of transmission:")
         print(error)
-        print("ground_truth")
-        print(grad_groudtruth)
+        #print(error_2)
         print("L2 norm of error: ", np.linalg.norm(error))
+        #print("L2 norm of error: ", np.linalg.norm(error_2))
 
         #update global weights
         FedAvg_Air(w_glob, grad_receive, args)

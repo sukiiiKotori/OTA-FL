@@ -1,10 +1,45 @@
 import numpy as np
 import cvxpy as cp
+import matplotlib.pyplot as plt
+
+def Golden_Search(f, l, r, tol=1e-10, max_iter=10000):
+    a = l
+    b = r
+
+    def calculate_lambda(a, b, ratio=0.382):
+        return a + ratio * (b - a)
+
+    def calculate_mu(a, b, ratio=0.618):
+        return a + ratio * (b - a)
+
+    Mui = calculate_mu(a, b)
+    Mui_value = f(Mui)
+
+    Lamb = calculate_lambda(a, b)
+    Lamb_value= f(Lamb)
+
+
+    for _ in range(max_iter): #判断是否到达终止线
+        if abs(f(a)-f(b)) < tol:
+            break
+        elif Lamb_value < Mui_value:
+            b = Mui
+            Mui = Lamb
+            Lamb = calculate_lambda(a, b)
+        else:
+            a = Lamb
+            Lamb = Mui
+            Mui = calculate_mu(a, b)
+
+        Mui_value = f(Mui)
+        Lamb_value = f(Lamb)
+
+    return (a+b)/2
 
 def optimal_power(P_max, beta_1, beta_2, data_per_user, F, H, u_max, v_max, D, sigma_n):
     # not condsider user selection
     user_list = [i for i in range(len(data_per_user))]
-    """ sum_data = sum(data_per_user)
+    sum_data = sum(data_per_user)
     inner = np.array(F).conj() @ H #(1xN @ NxM = 1xM)
     term_1 = D * sigma_n**2 / sum_data**2
     term_2 = (np.array(data_per_user) / np.abs(inner))**2
@@ -12,22 +47,42 @@ def optimal_power(P_max, beta_1, beta_2, data_per_user, F, H, u_max, v_max, D, s
     b = term_1 * v_max**2 * np.sum(term_2)
     c = term_1 * v_max**2 * (D * sigma_n**2) * np.max(term_2 / np.abs(inner)**2)
     d = term_1 * np.max(term_2)
-    print(sigma_n**2)
-    print(a,b,c,d)
     rho = 0
-    P_G = cp.Variable()
-    objective = cp.Minimize(((a+b+c/P_G+2*(a*b+a*c/P_G)**0.5)/(P_max-P_G)+beta_1/(2*beta_2)) / (1-2*beta_2*(rho+d/P_G)))
-    constraints = [
-        (1 - 2 * beta_2 * rho) / (2 * beta_2 * d) <= P_G,
-        P_G <= P_max 
-    ]
-    problem = cp.Problem(objective, constraints)
-    problem.solve()
-    P_G = P_G.value
-    P_u = (P_max - P_G)*((a*P_G)**0.5/((a*P_G)**0.5 + (b*P_G+c)**0.5))
-    P_v = P_max - P_G - P_u """
+    #print(sigma_n**2)
+    print("a,b,c,d,rho:",a,b,c,d,rho)
+    print("beta1, beta2", beta_1, beta_2)
+    print("P_max",P_max)
+    
+    #P_G = cp.Variable()
+    #objective = cp.Minimize(((a+b+c/P_G+2*(a*b+a*c/P_G)**0.5)/(P_max-P_G)+beta_1/(2*beta_2)) / (1-2*beta_2*(rho+d/P_G)))
+    #constraints = [
+    #    (1 - 2 * beta_2 * rho) / (2 * beta_2 * d) <= P_G,
+    #    P_G <= P_max 
+    #]
+    #problem = cp.Problem(objective, constraints)
+    #problem.solve()
+    def objective(P_G):
+        return ((a+b+c/P_G+2*(a*b+a*c/P_G)**0.5)/(P_max-P_G)+beta_1/(2*beta_2)) / (1-2*beta_2*(rho+d/P_G))
+    #x = np.linspace((1 - 2 * beta_2 * rho) / (2 * beta_2 * d) + 0.0001, P_max-0.0001 , 100)
+    #y = objective(x)
+    #plt.plot(x, y)
+    #plt.savefig('./obj.png')
+    left = (2 * beta_2 * d)/(1 - 2 * beta_2 * rho)
+    right = P_max
+    
+    print("min:", left)
+    print("max:", right)
+    
+    P_G = Golden_Search(objective,left,right)
+    print(objective(P_G-100),objective(P_G),objective(P_G+100))
 
-    return 200, 1000, 1000, user_list
+    #P_G = P_G.value
+    P_u = (P_max - P_G)*((a*P_G)**0.5/((a*P_G)**0.5 + (b*P_G+c)**0.5))
+    P_v = P_max - P_G - P_u
+
+    print(P_u, P_v, P_G)
+
+    return P_u, P_v, P_G, user_list
 
 def optimal_power_selection():
     p_u:float
