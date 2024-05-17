@@ -73,7 +73,7 @@ if __name__ == '__main__':
         net_glob = MLP(dim_in=len_in, dim_hidden=200, dim_out=args.num_classes).to(args.device)
     else:
         exit('Error: unrecognized model')
-    print(net_glob)
+    #print(net_glob)
     net_glob.train()
 
     # copy weights
@@ -90,18 +90,18 @@ if __name__ == '__main__':
     #initialize simulation settings
     # neuron model settings
     D = sum(p.numel() for p in net_glob.parameters()) #number of model weights
-    v_max = 5
-    u_max = 0.5
-    P_max = 0.1 * D * 2
-    beta_1 = 1.0
-    beta_2 = 2.0
+    v_max = 0.4
+    u_max = 0.05
+    P_max = 100
+    beta_1 = 3.0
+    beta_2 = 4.0
 
     # communication settings
-    sigma_n = 1e-4 # sqrt(noise power)
+    sigma_n = 1e-5 # sqrt(noise power)
     PL_exponent = 2.5 # User-BS Path loss exponent
     fc = 915 * 10**6 # carrier frequency 915MHz
     wave_lenth = 3.0 * 10**8 / fc # wave_lenth = c/f
-    BS_gain = 10**(20.0/10) # BS antenna gain 20dBi
+    BS_gain = 10**(15.0/10) # BS antenna gain 20dBi
     User_gain = 10**(5.0/10) # user antenna gain 5dBi
     dist_max = 1000.0 # to quantify distance
     BS_hight = 10 # BS hight is 10m
@@ -110,7 +110,7 @@ if __name__ == '__main__':
     F = [1.0 / np.sqrt(args.N)] * args.N
 
     if args.radius == 'same': 
-        radius = np.array([25] * args.num_users) # same distance of all users
+        radius = np.array([50] * args.num_users) # same distance of all users
     elif args.radius == 'random_small':
         radius = np.random.rand(args.num_users) * 25 + 25 # (25,50)
     elif args.radius == 'random_large':
@@ -125,20 +125,14 @@ if __name__ == '__main__':
     Path_loss = BS_gain * User_gain * (wave_lenth / (4 * np.pi * BS_dist))**PL_exponent
 
     # get shadow loss
-    shadow_loss = (np.random.randn(args.N, args.num_users) + 1j * np.random.randn(args.N, args.num_users)) / 2**0.5
-    #shadow_loss = np.ones((args.N, args.num_users))
+    #shadow_loss = (np.random.randn(args.N, args.num_users) + 1j * np.random.randn(args.N, args.num_users)) / 2**0.5
+    shadow_loss = np.ones((args.N, args.num_users))
 
     print("PL", Path_loss)
 
     H_origin = shadow_loss * np.sqrt(Path_loss)
 
     print(H_origin)
-    N, M = H_origin.shape
-    noise = (np.random.randn(N, M)+1j*np.random.randn(N, M)) / 2**0.5 * sigma_n
-    noise_factor = np.array(F).conj() @ noise #(1xN @ NxM = 1xM)
-    inner = np.array(F).conj() @ H_origin #(1xN @ NxM = 1xM)
-    p_v = np.sqrt(1)
-    print("receive error:",  (v_max * noise_factor)/(p_v * inner))
     # get the number of dataset per user have
 
     #exit('test')
@@ -151,11 +145,11 @@ if __name__ == '__main__':
     # not consider user selection M and beamforming vector f
     if args.all_clients:
         # all users are selected 
-        P_u, P_v, P_G, user_list = optimal_power(P_max, beta_1, beta_2, data_per_user, F, H_origin, u_max, v_max, D, sigma_n)
+        P_u, P_v, P_G, user_list, _, _, _ = optimal_power(P_max, beta_1, beta_2, data_per_user, F, H_origin, u_max, v_max, D, sigma_n)
     else:
         P_u, P_v, P_G, user_list = optimal_power_selection()
 
-    exit("test opt")
+    #exit("test opt")
     H = H_origin[:, user_list]
 
     num_users = len(user_list)
@@ -224,7 +218,7 @@ if __name__ == '__main__':
 
         #grad_receive_abs = (grad_receive_abs + bias) / total_size
 
-        grad_groudtruth = np.average(grad_locals, axis=0, weights= np.array(data_per_user))
+        grad_groudtruth = np.average(grad_locals, axis=0, weights=np.array(data_per_user))
 
         error = grad_receive - grad_groudtruth
         #error_2 = grad_receive_abs - grad_groudtruth

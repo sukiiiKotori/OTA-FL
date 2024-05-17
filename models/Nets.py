@@ -76,9 +76,9 @@ class ResnetCifar(nn.Module):
     def forward(self, x):
         return self.resnet(x)
     
-class MobileNet(nn.Module):
+class MobileNetV3(nn.Module):
     def __init__(self, classes):
-        super(MobileNet, self).__init__()
+        super(MobileNetV3, self).__init__()
         self.mobilenet = torchvision.models.mobilenet_v3_large(weights = None)
         # do some change in mobilenet
         # reduce down-sampling times from 5 to 2

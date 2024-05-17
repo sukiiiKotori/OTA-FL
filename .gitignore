@@ -50,9 +50,12 @@ venv/
 ENV/
 
 # test file
-/test*.py
+#/test*.py
 
 # log file
 /log
 /save
 result*
+
+# simulation file
+simulation_results/*

@@ -25,7 +25,7 @@ def transmission_mean(mean_locals, dist_locals, P_u, F, H, u_max, dist_max, sigm
     # formula (16)
     receive_signals = np.abs(np.array(mean_locals)) * np.exp(1j*theta) + (u_max * noise_factor) / (p_u * inner)
     #print("receive SNR:",(u_max * noise_factor) / (p_u * inner))
-    #print("receive error norm:",np.linalg.norm(np.abs(receive_signals) - mean_locals))
+    print("receive error norm:",np.linalg.norm(np.abs(receive_signals) - mean_locals))
     #print("receive error real:",np.linalg.norm(np.real(receive_signals) - mean_locals))
     return np.abs(receive_signals), np.angle(receive_signals) / 2*np.pi * dist_max
 
