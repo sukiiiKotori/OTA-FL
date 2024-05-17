@@ -10,7 +10,7 @@ def args_parser():
     parser.add_argument('--epochs', type=int, default=10, help="rounds of training")
     parser.add_argument('--num_users', type=int, default=10, help="number of users: K")
     parser.add_argument('--local_ep', type=int, default=5, help="the number of local epochs: E")
-    parser.add_argument('--local_bs', type=int, default=10, help="local batch size: B")
+    parser.add_argument('--local_bs', type=int, default=32, help="local batch size: B")
     parser.add_argument('--bs', type=int, default=128, help="test batch size")
     parser.add_argument('--lr', type=float, default=0.01, help="learning rate")
     parser.add_argument('--momentum', type=float, default=0.5, help="SGD momentum (default: 0.5)")
@@ -18,21 +18,21 @@ def args_parser():
     parser.add_argument('--num_dataset', type=int, default=30000, help="number of dataset")
 
     # communication arguments
-    parser.add_argument('--N', type=int, default=10, help="number of BS antennas")
+    parser.add_argument('--N', type=int, default=1, help="number of BS antennas")
     parser.add_argument('--P_max', type=float, default=1.0, help="total transmit power")
     parser.add_argument('--SNR', type=float, default=90.0, help="signal-to-noise ratio, P_0/sigma^2_n in dB")
+    parser.add_argument('--radius', type=str, default='same', help="radius of users, options are 'same', 'random_small', 'random_large'.")
 
     # net arguments
     parser.add_argument('--beta1', type=float, default=1.0, help="beta_1 defined in Assumption 3")
     parser.add_argument('--beta2', type=float, default=1.0, help="beta_2 defined in Assumption 3")
 
     # simulation arguments
-    parser.add_argument('--fading', action='store_true', help="whether consider channel fading")
     parser.add_argument('--all_clients', action='store_true', help='aggregation over all clients')
     parser.add_argument('--static', action='store_true', help="whether consider dynamic power allocation")
 
     # model arguments
-    parser.add_argument('--model', type=str, default='mlp', help='model name')
+    parser.add_argument('--model', type=str, default='cnn', help='model name')
     parser.add_argument('--kernel_num', type=int, default=9, help='number of each kind of kernel')
     parser.add_argument('--kernel_sizes', type=str, default='3,4,5',
                         help='comma-separated kernel size to use for convolution')

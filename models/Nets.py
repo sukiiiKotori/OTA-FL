@@ -2,9 +2,9 @@
 # -*- coding: utf-8 -*-
 # Python version: 3.6
 
-import torch
 from torch import nn
 import torch.nn.functional as F
+import torchvision
 
 
 class MLP(nn.Module):
@@ -61,3 +61,39 @@ class CNNCifar(nn.Module):
         x = F.relu(self.fc2(x))
         x = self.fc3(x)
         return x
+
+class ResnetCifar(nn.Module):
+    def __init__(self, args):
+        super(ResnetCifar, self).__init__()
+        self.resnet = torchvision.models.resnet18(weights = torchvision.models.ResNet18_Weights.IMAGENET1K_V1)
+        # 7x7 kernel to 3x3 kernel
+        self.resnet.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False)
+        # delete maxpool layer
+        self.resnet.maxpool = nn.Identity()
+        # change output dimension
+        self.resnet.fc = nn.Linear(self.resnet.fc.in_features, args.num_classes)
+
+    def forward(self, x):
+        return self.resnet(x)
+    
+class MobileNet(nn.Module):
+    def __init__(self, classes):
+        super(MobileNet, self).__init__()
+        self.mobilenet = torchvision.models.mobilenet_v3_large(weights = None)
+        # do some change in mobilenet
+        # reduce down-sampling times from 5 to 2
+        # because mobilenet is proposed to classify (224x224) images
+        # down-sampling from 224 to 224/2**5 = 7
+        # we only down-sampling 2 times, from 32 to 32/2**2 = 8
+        self.mobilenet.features[0][0].stride = (1,1)
+        self.mobilenet.features[2].block[1][0].stride = (1,1)
+        self.mobilenet.features[4].block[1][0].stride = (1,1)
+        # modify classifier
+        self.mobilenet.classifier[3] = nn.Linear(1280, classes)
+        # reduce conv layers
+        del self.mobilenet.features[1]
+        del self.mobilenet.features[2]
+        del self.mobilenet.features[3]
+
+    def forward(self, x):
+        return self.mobilenet(x)

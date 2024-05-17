@@ -9,6 +9,7 @@ def transmission_var(var_locals, mean_locals, P_v, F, H, v_max, sigma_n):
     p_v = np.sqrt(P_v)
     # formula (17)
     receive_signals = var_locals * np.sign(mean_locals) + (v_max * noise_factor) / (p_v * inner)
+    print("receive SNR:",(v_max * noise_factor) / (p_v * inner))
     return np.abs(receive_signals), np.sign(np.real(receive_signals))
 
 def transmission_mean(mean_locals, dist_locals, P_u, F, H, u_max, dist_max, sigma_n):

@@ -50,7 +50,7 @@ venv/
 ENV/
 
 # test file
-test*.py
+/test*.py
 
 # log file
 /log

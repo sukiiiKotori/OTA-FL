@@ -14,8 +14,8 @@ from datetime import datetime
 from utils.sampling import *
 from utils.options import args_parser
 from utils.optimization import *
-from models.Update import LocalUpdate
-from models.Nets import MLP, CNNMnist, CNNCifar
+from models.Update import *
+from models.Nets import *
 from models.Fed import *
 from models.test import test_img
 from AirComp import *
@@ -28,23 +28,23 @@ if __name__ == '__main__':
 
     # parse args
     args = args_parser()
-    if torch.cuda.is_available():
-        args.device = torch.device('cuda:0')
-    elif torch.backends.mps.is_available():
-        args.device = torch.device('mps')
-    else:
-        args.device = torch.device('cpu')
-
-    args.device = torch.device('cpu')
-    print('device: ', args.device)
 
     # load dataset and split users
     if args.dataset == 'mnist':
+        # use cpu
+        args.device = torch.device('cpu')
         trans_mnist = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))])
         dataset_train = datasets.MNIST('../data/mnist/', train=True, download=True, transform=trans_mnist)
         dataset_test = datasets.MNIST('../data/mnist/', train=False, download=True, transform=trans_mnist)
     elif args.dataset == 'cifar':
-        trans_cifar = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+        # use gpu
+        if torch.cuda.is_available():
+            args.device = torch.device('cuda:0')
+        elif torch.backends.mps.is_available():
+            args.device = torch.device('mps')
+        else:
+            args.device = torch.device('cpu')
+        trans_cifar = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616))])
         dataset_train = datasets.CIFAR10('../data/cifar', train=True, download=True, transform=trans_cifar)
         dataset_test = datasets.CIFAR10('../data/cifar', train=False, download=True, transform=trans_cifar)
     else:
@@ -55,16 +55,14 @@ if __name__ == '__main__':
     else:
         dict_users = noniid(dataset_train, args.num_users)
     
-    # get the number of dataset per user have
-    data_per_user = []
-    for _,v in dict_users.items():
-        data_per_user.append(len(v))
-    print(data_per_user)
-    
     img_size = dataset_train[0][0].shape
 
     # build model
-    if args.model == 'cnn' and args.dataset == 'cifar':
+    if args.model == 'mobilenet':
+        net_glob = MobileNet(args=args).to(args.device)
+    elif args.model == 'resnet':
+        net_glob = ResnetCifar(args=args).to(args.device)
+    elif args.model == 'cnn' and args.dataset == 'cifar':
         net_glob = CNNCifar(args=args).to(args.device)
     elif args.model == 'cnn' and args.dataset == 'mnist':
         net_glob = CNNMnist(args=args).to(args.device)
@@ -90,37 +88,79 @@ if __name__ == '__main__':
     val_acc_list, net_list = [], []
 
     #initialize simulation settings
+    # neuron model settings
     D = sum(p.numel() for p in net_glob.parameters()) #number of model weights
     v_max = 5
     u_max = 0.5
-    sigma_n = 1e-3
-    dist_max = 1000.0 # to quantify distance
+    P_max = 0.1 * D
+    beta_1 = 1.0
+    beta_2 = 2.0
 
-    if args.fading: # consider channel fading
-        # module (0,1)
-        H_mod = np.random.uniform(low=0.0, high=1.0, size=(args.N, args.num_users))
-        # phase (0,2π)
-        H_phase = np.random.uniform(low=0.0, high=2*np.pi, size=(args.N, args.num_users))
-        # H = (0,1)e^(j(0,2π))
-        H = H_mod * np.exp(1j * H_phase)
-        F = optimal_beamforming() #to be continue
+    # communication settings
+    sigma_n = 1e-3 # sqrt(noise power)
+    PL_exponent = 3.76 # User-BS Path loss exponent
+    fc = 915 * 10**6 # carrier frequency 915MHz
+    wave_lenth = 3.0 * 10**8 / fc # wave_lenth = c/f
+    BS_gain = 10**(5.0/10) # BS antenna gain 5dBi
+    User_gain = 10**(0.0/10) # user antenna gain 0dBi
+    dist_max = 1000.0 # to quantify distance
+    BS_hight = 10 # BS hight is 10m
+
+    # optimal F is comming soon, now we just don't consider it
+    F = [1.0 / np.sqrt(args.N)] * args.N
+
+    if args.radius == 'same': 
+        radius = np.array([25] * args.num_users) # same distance of all users
+    elif args.radius == 'random_small':
+        radius = np.random.rand(args.num_users) * 25 + 25 # (25,50)
+    elif args.radius == 'random_large':
+        radius = np.concatenate(np.random.rand(args.num_users-int(np.round(args.num_users/2))) * 25 + 25, int(np.round(args.num_users/2)) * 50 + 150) # half (25,50) and half (150,200)
     else:
-        # not consider channel fading, so every term in f is equal to 1/sqrt(N)
-        H = np.ones((args.N, args.num_users), dtype = complex)
-        F = [1.0 / np.sqrt(args.N)] * args.N
+        exit('Error: unrecognized radius')
+
+    # get distances from users to BS
+    BS_dist = np.sqrt(radius**2 + BS_hight**2)
+
+    # get path loss
+    Path_loss = BS_gain * User_gain * (wave_lenth / (4 * np.pi * BS_dist))**PL_exponent
+
+    # get shadow loss
+    #shadow_loss = (np.random.randn(args.N, args.num_users) + 1j * np.random.randn(args.N, args.num_users)) / 2**0.5
+    shadow_loss = np.ones(args.N, args.num_users)
+
+    print("PL", Path_loss)
+
+    H_origin = shadow_loss * np.sqrt(Path_loss)
+
+    print(H_origin)
+    N, M = H_origin.shape
+    noise = (np.random.randn(N, M)+1j*np.random.randn(N, M)) / 2**0.5 * sigma_n
+    noise_factor = np.array(F).conj() @ noise #(1xN @ NxM = 1xM)
+    inner = np.array(F).conj() @ H_origin #(1xN @ NxM = 1xM)
+    p_v = np.sqrt(1)
+    print("receive SNR:", (p_v * inner) / (v_max * noise_factor))
+    # get the number of dataset per user have
+
+    exit('test')
+    data_per_user = []
+    for _,v in dict_users.items():
+        data_per_user.append(len(v))
+    print(data_per_user)
 
     # derive optimal transmit power
     # not consider user selection M and beamforming vector f
     if args.all_clients:
         # all users are selected 
-        P_u, P_v, P_G, user_list = optimal_power()
+        P_u, P_v, P_G, user_list = optimal_power(P_max, beta_1, beta_2, data_per_user, F, H_origin, u_max, v_max, D, sigma_n)
     else:
         P_u, P_v, P_G, user_list = optimal_power_selection()
 
+    H = H_origin[:, user_list]
+
     num_users = len(user_list)
-    if num_users < args.num_users:
-        pass
-    total_size = sum(data_per_user[idx] for idx in user_list)
+    data_per_user_new = [data_per_user[idx] for idx in user_list]
+    data_per_user = data_per_user_new
+    total_size = sum(data_per_user)
     
     #print(total_size)
     

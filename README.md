@@ -55,4 +55,4 @@ McMahan, Brendan, Eider Moore, Daniel Ramage, Seth Hampson, and Blaise Aguera y 
 Shaoxiong Ji. (2018, March 30). A PyTorch Implementation of Federated Learning. Zenodo. http://doi.org/10.5281/zenodo.4321561
 
 
-/Volumes/work/venv/fl/bin/python main_fed.py --dataset mnist --iid --num_channels 1 --model cnn --epochs 50 --gpu 0 --all_clients --static
+/Volumes/work/venv/fl/bin/python main_fed.py --dataset mnist --iid --num_channels 1 --model cnn --epochs 50 --all_clients --static --radius same
