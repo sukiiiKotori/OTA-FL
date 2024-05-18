@@ -27,7 +27,7 @@ class MLP(nn.Module):
 class CNNMnist(nn.Module):
     def __init__(self, args):
         super(CNNMnist, self).__init__()
-        self.conv1 = nn.Conv2d(args.num_channels, 10, kernel_size=5)
+        self.conv1 = nn.Conv2d(1, 10, kernel_size=5)
         self.conv2 = nn.Conv2d(10, 20, kernel_size=5)
         self.conv2_drop = nn.Dropout2d()
         self.fc1 = nn.Linear(320, 50)
@@ -76,10 +76,10 @@ class ResnetCifar(nn.Module):
     def forward(self, x):
         return self.resnet(x)
     
-class MobileNetV3(nn.Module):
-    def __init__(self, classes):
-        super(MobileNetV3, self).__init__()
-        self.mobilenet = torchvision.models.mobilenet_v3_large(weights = None)
+class MobileNet(nn.Module):
+    def __init__(self, args):
+        super(MobileNet, self).__init__()
+        self.mobilenet = torchvision.models.mobilenet_v3_large(weights = torchvision.models.MobileNet_V3_Large_Weights.IMAGENET1K_V1)
         # do some change in mobilenet
         # reduce down-sampling times from 5 to 2
         # because mobilenet is proposed to classify (224x224) images
@@ -89,11 +89,26 @@ class MobileNetV3(nn.Module):
         self.mobilenet.features[2].block[1][0].stride = (1,1)
         self.mobilenet.features[4].block[1][0].stride = (1,1)
         # modify classifier
-        self.mobilenet.classifier[3] = nn.Linear(1280, classes)
+        self.mobilenet.classifier[3] = nn.Linear(1280, args.num_classes)
         # reduce conv layers
         del self.mobilenet.features[1]
         del self.mobilenet.features[2]
         del self.mobilenet.features[3]
+
+    def forward(self, x):
+        return self.mobilenet(x)
+    
+class MobileNet_small(nn.Module):
+    def __init__(self, args):
+        super(MobileNet_small, self).__init__()
+        self.mobilenet = torchvision.models.mobilenet_v3_small(weights = torchvision.models.MobileNet_V3_Small_Weights.IMAGENET1K_V1)
+        self.mobilenet.features[0][0].stride = (1,1)
+        self.mobilenet.features[1].block[0][0].stride = (1,1)
+        self.mobilenet.features[2].block[1][0].stride = (1,1)
+        self.mobilenet.classifier[3] = nn.Linear(1024, args.num_classes)
+        del self.mobilenet.features[3]
+        del self.mobilenet.features[4]
+        
 
     def forward(self, x):
         return self.mobilenet(x)

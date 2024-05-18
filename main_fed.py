@@ -60,6 +60,8 @@ if __name__ == '__main__':
     # build model
     if args.model == 'mobilenet':
         net_glob = MobileNet(args=args).to(args.device)
+    elif args.model == 'mobilenet_small':
+        net_glob = MobileNet_small(args=args).to(args.device)
     elif args.model == 'resnet':
         net_glob = ResnetCifar(args=args).to(args.device)
     elif args.model == 'cnn' and args.dataset == 'cifar':
@@ -90,19 +92,20 @@ if __name__ == '__main__':
     #initialize simulation settings
     # neuron model settings
     D = sum(p.numel() for p in net_glob.parameters()) #number of model weights
-    v_max = 0.4
-    u_max = 0.05
-    P_max = 100
-    beta_1 = 3.0
+    print("total dimension of model weight",D)
+    v_max = 0.15
+    u_max = 0.02
+    P_max = 150
+    beta_1 = 2.0
     beta_2 = 4.0
 
     # communication settings
-    sigma_n = 1e-5 # sqrt(noise power)
+    sigma_n = (1e-9)**0.5 # sqrt(noise power)
     PL_exponent = 2.5 # User-BS Path loss exponent
     fc = 915 * 10**6 # carrier frequency 915MHz
     wave_lenth = 3.0 * 10**8 / fc # wave_lenth = c/f
-    BS_gain = 10**(15.0/10) # BS antenna gain 20dBi
-    User_gain = 10**(5.0/10) # user antenna gain 5dBi
+    BS_gain = 10**(10.0/10) # BS antenna gain 20dBi
+    User_gain = 10**(0.0/10) # user antenna gain 5dBi
     dist_max = 1000.0 # to quantify distance
     BS_hight = 10 # BS hight is 10m
 
@@ -158,6 +161,10 @@ if __name__ == '__main__':
     total_size = sum(data_per_user)
     
     #print(total_size)
+    loss_train_list = []
+    loss_test_list = []
+    acc_train_list = []
+    acc_test_list = []
     
     for iter in range(args.epochs):
         loss_locals = []
@@ -225,6 +232,8 @@ if __name__ == '__main__':
 
         print("Error of transmission:")
         print(error)
+        print("groundtruth")
+        print(grad_groudtruth)
         #print(error_2)
         print("L2 norm of error: ", np.linalg.norm(error))
         #print("L2 norm of error: ", np.linalg.norm(error_2))
@@ -235,16 +244,47 @@ if __name__ == '__main__':
         # copy weight to net_glob
         net_glob.load_state_dict(w_glob)
 
-        # print loss
-        loss_avg = sum(loss_locals) / len(loss_locals)
-        print('Round {:3d}, Average loss {:.3f}'.format(iter, loss_avg))
-        loss_train.append(loss_avg)
+        # test model
+        with torch.no_grad():
+            acc_train, loss_train = test_img(net_glob, dataset_train, args)
+            acc_test, loss_test = test_img(net_glob, dataset_test, args)
 
+        net_glob.train()
+
+        acc_train_list.append(acc_train)
+        acc_test_list.append(acc_test)
+        loss_train_list.append(loss_train)
+        loss_test_list.append(loss_test)
+            
+    # './save/train_acc_fed_{}_{}_iid{}_Pm{}_u{}_v{}_b1{}_b2{}_sigman{}_Bg{}_Ug{}.png'.format(args.dataset, args.model, args.iid, P_max, u_max,v_max,beta_1,beta_2,sigma_n,round(10*np.log10(BS_gain),1),round(10*np.log10(User_gain),1))
     # plot loss curve
     plt.figure()
-    plt.plot(range(len(loss_train)), loss_train)
+    plt.plot(range(len(acc_train_list)), acc_train_list)
+    plt.title('train_acc_Pm{}_u{}_v{}_b1{}_b2{}_sigman{}_Bg{}_Ug{}'.format(P_max, u_max,v_max,beta_1,beta_2,sigma_n,round(10*np.log10(BS_gain),1),round(10*np.log10(User_gain),1)))
+    plt.ylabel('train_acc')
+    plt.savefig('./save/train_acc_fed_{}_{}_iid{}.png'.format(args.dataset, args.model, args.iid))
+    plt.close()
+
+    plt.figure()
+    plt.plot(range(len(acc_test_list)), acc_test_list)
+    plt.title('test_acc_Pm{}_u{}_v{}_b1{}_b2{}_sigman{}_Bg{}_Ug{}'.format(P_max, u_max,v_max,beta_1,beta_2,sigma_n,round(10*np.log10(BS_gain),1),round(10*np.log10(User_gain),1)))
+    plt.ylabel('test_acc')
+    plt.savefig('./save/test_acc_fed_{}_{}_iid{}.png'.format(args.dataset, args.model, args.iid))
+    plt.close()
+
+    plt.figure()
+    plt.plot(range(len(loss_train_list)), loss_train_list)
+    plt.title('train_loss_Pm{}_u{}_v{}_b1{}_b2{}_sigman{}_Bg{}_Ug{}'.format(P_max, u_max,v_max,beta_1,beta_2,sigma_n,round(10*np.log10(BS_gain),1),round(10*np.log10(User_gain),1)))
     plt.ylabel('train_loss')
-    plt.savefig('./save/fed_{}_{}_{}_iid{}_{}.png'.format(args.dataset, args.model, args.epochs, args.iid, datetime.now().strftime('%Y-%m-%d-%H:%M')))
+    plt.savefig('./save/train_loss_fed_{}_{}_iid{}.png'.format(args.dataset, args.model, args.iid))
+    plt.close()
+
+    plt.figure()
+    plt.plot(range(len(loss_test_list)), loss_test_list)
+    plt.title('test_loss_Pm{}_u{}_v{}_b1{}_b2{}_sigman{}_Bg{}_Ug{}'.format(P_max, u_max,v_max,beta_1,beta_2,sigma_n,round(10*np.log10(BS_gain),1),round(10*np.log10(User_gain),1)))
+    plt.ylabel('test_loss')
+    plt.savefig('./save/test_loss_fed_{}_{}_iid{}.png'.format(args.dataset, args.model, args.iid))
+    plt.close()
 
     # testing
     net_glob.eval()

@@ -25,5 +25,5 @@ def FedAvg_Air(weight_global, grad, args):
         shape = np.array(weight_global[k].size())
         if len(shape):
             lenth = np.prod(shape)
-            weight_global[k] -= torch.from_numpy(np.reshape(grad[idx:idx+lenth],shape)).float().to(args.device) * lr * local_ep
+            weight_global[k] -= torch.from_numpy(np.reshape(grad[idx:idx+lenth],shape)).float().to(args.device) * lr 
             idx += lenth

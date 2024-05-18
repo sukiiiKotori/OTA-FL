@@ -67,8 +67,7 @@ class LocalUpdate(object):
         new_weight = net.state_dict()
         for k in initial_weight.keys():
             # divided by learning rate to get true gradients
-            # and then devided by local_ep to get avg gradients per epoch
-            grad_dict[k] = (initial_weight[k] - new_weight[k]).cpu() / self.args.lr / self.args.local_ep
+            grad_dict[k] = (initial_weight[k] - new_weight[k]).cpu() / self.args.lr
         #print(grad_dict)
         flat_grad = np.array([])
         for _, v in grad_dict.items():

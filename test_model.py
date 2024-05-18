@@ -24,7 +24,7 @@ class ResnetCifar(nn.Module):
 class MobileNetV3(nn.Module):
     def __init__(self, classes):
         super(MobileNetV3, self).__init__()
-        self.mobilenet = torchvision.models.mobilenet_v3_large(weights = None)
+        self.mobilenet = torchvision.models.mobilenet_v3_large(weights = models.MobileNet_V3_Large_Weights.IMAGENET1K_V1)
         # do some change in mobilenet
         # reduce down-sampling times from 5 to 2
         # because mobilenet is proposed to classify (224x224) images
@@ -83,7 +83,7 @@ def test_img(net_g, datatest):
     test_loss = 0
     correct = 0
     device = torch.device('mps')
-    data_loader = DataLoader(datatest, batch_size=512)
+    data_loader = DataLoader(datatest, batch_size=1000)
     l = len(data_loader)
     for idx, (data, target) in enumerate(data_loader):
         data, target = data.to(device), target.to(device)
@@ -102,7 +102,10 @@ if __name__ == "__main__":
     dataset_train = datasets.CIFAR10('../data/cifar', train=True, download=True, transform=trans_cifar)
     dataset_test = datasets.CIFAR10('../data/cifar', train=False, download=True, transform=trans_cifar)
 
-    net = MobileNetV3(10).to(device)
+    #net = MobileNetV3(10).to(device)
+    net = MobileNetV3_small(10).to(device)
+    #print(net)
+    #exit('test')
     net.train()
     """ net.load_state_dict(torch.load('./save/resnet_cifar2.pth'))
     print(test_img(net,dataset_train))
@@ -118,7 +121,7 @@ if __name__ == "__main__":
     optimizer = torch.optim.SGD(net.parameters(), lr=0.01, momentum=0.8)
     loss_func = nn.CrossEntropyLoss()
 
-    ldr_train = DataLoader(dataset_train, batch_size=1250, shuffle=True)
+    ldr_train = DataLoader(dataset_train, batch_size=2500, shuffle=True)
 
     epoch_loss = []
     epoch_test_acc = []
@@ -135,8 +138,9 @@ if __name__ == "__main__":
             batch_loss.append(loss.item())
             #print("epoch", iter, "batch", batch_idx, "loss:", loss.item())
         net.eval()
-        acc_test = test_img(net, dataset_test)
-        acc_train = test_img(net, dataset_train)
+        with torch.no_grad():
+            acc_test = test_img(net, dataset_test)
+            acc_train = test_img(net, dataset_train)
         net.train()
         epoch_loss.append(sum(batch_loss)/len(batch_loss))
         epoch_test_acc.append(acc_test)
@@ -145,24 +149,24 @@ if __name__ == "__main__":
         print("epoch", iter+1, "train acc: ", acc_train)
         print("epoch", iter+1, "test acc: ", acc_test)
         if iter != 0 and iter % 10 == 0:
-            torch.save(net.state_dict(), './save/mobilenet_ds2.pth')
+            torch.save(net.state_dict(), './save/mobilenet_small.pth')
 
     net.eval()
 
     plt.figure()
     plt.plot(range(len(epoch_loss)), epoch_loss)
     plt.ylabel('train_loss')
-    plt.savefig('./save/mobilenet_ds2_loss.png')
+    plt.savefig('./save/mobilenet_small_loss.png')
     plt.close()
 
     plt.figure()
     plt.plot(range(len(epoch_test_acc)), epoch_test_acc)
     plt.ylabel('test_acc')
-    plt.savefig('./save/mobilenet_ds2_test_acc.png')
+    plt.savefig('./save/mobilenet_small_test_acc.png')
     plt.close()
 
     plt.figure()
     plt.plot(range(len(epoch_train_acc)), epoch_train_acc)
     plt.ylabel('train_acc')
-    plt.savefig('./save/mobilenet_ds2_train_acc.png')
+    plt.savefig('./save/mobilenet_small_train_acc.png')
     plt.close()

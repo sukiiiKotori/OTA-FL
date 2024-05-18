@@ -2,8 +2,8 @@ import numpy as np
 import cvxpy as cp
 import matplotlib.pyplot as plt
 #from main_fed import *
-#from options import *
-#from sampling import *
+from options import *
+from sampling import *
 from datetime import datetime
 
 def Golden_Search(f, l, r, tol=1e-10, max_iter=10000):
@@ -114,20 +114,20 @@ if __name__ == '__main__':
     dataset_train = datasets.MNIST('../data/mnist/', train=True, download=True, transform=trans_mnist)
     dict_users = iid(dataset_train, args.num_users)
 
-    D = 20000
-    v_max = 0.4
-    u_max = 0.1
+    D = 21840
+    v_max = 0.15
+    u_max = 0.02
     #P_max = 1000
-    beta_1 = 3.0
+    beta_1 = 2.0
     beta_2 = 4.0
 
     # communication settings
-    sigma_n = 1e-5 # sqrt(noise power)
+    sigma_n = (1e-9)**0.5 # sqrt(noise power)
     PL_exponent = 2.5 # User-BS Path loss exponent
     fc = 915 * 10**6 # carrier frequency 915MHz
     wave_lenth = 3.0 * 10**8 / fc # wave_lenth = c/f
-    BS_gain = 10**(15.0/10) # BS antenna gain 20dBi
-    User_gain = 10**(5.0/10) # user antenna gain 5dBi
+    BS_gain = 10**(10.0/10) # BS antenna gain 10dBi
+    User_gain = 10**(0.0/10) # user antenna gain 5dBi
     dist_max = 1000.0 # to quantify distance
     BS_hight = 10 # BS hight is 10m
 
@@ -169,21 +169,21 @@ if __name__ == '__main__':
     even_list = []
     main_grad_list = []
 
-    """ for P_max in range(20, 501, 5):
+    for P_max in range(100, 2000, 2):
         _, _, _,_, proposed, even, main_grad = optimal_power(P_max, beta_1, beta_2, data_per_user, F, H_origin, u_max, v_max, D, sigma_n)
         proposed_list.append(proposed)
         even_list.append(even)
         main_grad_list.append(main_grad)
     
-    plt.plot(range(20, 501, 5), proposed_list, label='Proposed')
-    plt.plot(range(20, 501, 5), even_list, label='Even')
-    plt.plot(range(20, 501, 5), main_grad_list, label='GradientPrimary')
+    plt.plot(range(100, 2000, 2), proposed_list, label='Proposed')
+    plt.plot(range(100, 2000, 2), even_list, label='Even')
+    plt.plot(range(100, 2000, 2), main_grad_list, label='GradientPrimary')
 
     # 添加图例
     plt.legend()
 
     # 添加标题和轴标签
-    plt.title('Objective with different power allocations')
+    plt.title('D{}_u{}_v{}_b1{}_b2{}_sigman{}_Bg{}_Ug{}.png'.format(D,u_max,v_max,beta_1,beta_2,sigma_n,round(10*np.log10(BS_gain),1),round(10*np.log10(User_gain),1)))
     plt.xlabel('total power')
     plt.ylabel('Objective function')
 
@@ -192,8 +192,8 @@ if __name__ == '__main__':
 
     # 展示图像
     #plt.show()
-    plt.savefig('simulation_results/obj_power_{}.png'.format(datetime.now().strftime('%Y_%m_%d_%H:%M:%s'))) """
-    P_max = 100
+    plt.savefig('simulation_results/obj_power_{}.png'.format(datetime.now().strftime('%Y_%m_%d_%H:%M:%s')))
+    """ P_max = 30
     
     for distance in range(20, 150, 2):
         radius = np.array([distance] * args.num_users)
@@ -222,4 +222,4 @@ if __name__ == '__main__':
 
     # 展示图像
     #plt.show()
-    plt.savefig('simulation_results/obj_dis_{}.png'.format(datetime.now().strftime('%Y_%m_%d_%H:%M:%s')))
+    plt.savefig('simulation_results/obj_dis_{}.png'.format(datetime.now().strftime('%Y_%m_%d_%H:%M:%s'))) """

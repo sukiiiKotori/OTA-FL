@@ -10,7 +10,9 @@ def transmission_var(var_locals, mean_locals, P_v, F, H, v_max, sigma_n):
     # formula (17)
     receive_signals = var_locals * np.sign(mean_locals) + (v_max * noise_factor) / (p_v * inner)
     #print("receive SNR:",(v_max * noise_factor) / (p_v * inner))
-    print("receive error norm:",np.linalg.norm(np.abs(receive_signals) - var_locals))
+    print("true var:",var_locals)
+    print("receive var:",np.abs(receive_signals))
+    print("receive var error norm:",np.linalg.norm(np.abs(receive_signals) - var_locals))
     #print("receive error real:",np.linalg.norm(np.real(receive_signals) - var_locals))
     print("receive_sign_error:",np.sum(np.sign(np.real(receive_signals)*np.sign(mean_locals)))/M)
     return np.abs(receive_signals), np.sign(np.real(receive_signals))
@@ -25,7 +27,9 @@ def transmission_mean(mean_locals, dist_locals, P_u, F, H, u_max, dist_max, sigm
     # formula (16)
     receive_signals = np.abs(np.array(mean_locals)) * np.exp(1j*theta) + (u_max * noise_factor) / (p_u * inner)
     #print("receive SNR:",(u_max * noise_factor) / (p_u * inner))
-    print("receive error norm:",np.linalg.norm(np.abs(receive_signals) - mean_locals))
+    print("true var:",np.abs(mean_locals))
+    print("receive var:",np.abs(receive_signals))
+    print("receive error norm:",np.linalg.norm(np.abs(receive_signals) - np.abs(mean_locals)))
     #print("receive error real:",np.linalg.norm(np.real(receive_signals) - mean_locals))
     return np.abs(receive_signals), np.angle(receive_signals) / 2*np.pi * dist_max
 
